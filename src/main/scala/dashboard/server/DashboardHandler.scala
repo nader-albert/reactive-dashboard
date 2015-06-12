@@ -5,9 +5,10 @@ package dashboard.server
 //import org.joda.time.DateTime
 
 import dashboard.model._
+import shapeless.{HNil, HList}
 import spray.http.HttpHeaders.{Host, `Access-Control-Allow-Origin`}
 import spray.httpx.marshalling.Marshaller
-import spray.routing.{HttpServiceActor, HListDeserializer, HttpService}
+import spray.routing._
 
 import scala.concurrent.duration._
 import akka.util.Timeout
@@ -24,6 +25,8 @@ import spray.json._
  * @since  20/05/2015.
  */
 
+case class DashboardRequest(method: HttpMethod, path: PathMatcher[HNil]) //path shouldn't be represented as a String
+
 case class DashboardResponse(body: HttpEntity, code: StatusCode)
 
 object DashboardHandler {
@@ -31,7 +34,10 @@ object DashboardHandler {
   import scala.languageFeature.implicitConversions._
 }
 
-class DashboardHandler extends HttpServiceActor with ActorLogging {
+trait DashboardHandler extends HttpServiceActor with ActorLogging {
+
+  //self: Set =>
+
   implicit val timeout: Timeout = 1.second // for the actor 'asks'
   import context.dispatcher // ExecutionContext for the futures and scheduler
 
@@ -43,13 +49,16 @@ class DashboardHandler extends HttpServiceActor with ActorLogging {
   implicit val timeTableLoadingWriter = JsonWriter.func2Writer(TimeTableLoading.writer)
   implicit val timeTableReseedingStatusWriter = JsonWriter.func2Writer(ReseedingStatus.writer)
 
+  def reactions: Set[(DashboardRequest,DashboardResponse)]
 
+  /*
   override def receive: Receive = runRoute {
-    path("tcdc" / "dashboard"){
+
+    path("dashboard" / "home"){
       complete{
         toHTTPResponse(DashboardResponse(HttpEntity("dashboard home"), StatusCodes.OK))
       }
-    } ~ pathPrefix("tcdc" / "dashboard" / "timetable") {
+    } ~ pathPrefix("dashboard" / "dashboard" / "timetable") {
           path("status") {
             get {
               parameters('result.as[String] /*, 'time ?*/).as(TimeTableResult) { timeTableResult =>
@@ -107,6 +116,18 @@ class DashboardHandler extends HttpServiceActor with ActorLogging {
         }
       //TODO: HANDLE POST case with JSON // Use spray-json
     }
+  }*/
+
+  override def receive: Receive = runRoute {
+    reactions.map(reaction =>  path(reactions.head._1.path){
+        complete {
+          toHTTPResponse(reactions.head._2)
+        }
+      }).fold(path("dashboard" / "home"){
+          complete{
+            toHTTPResponse(DashboardResponse(HttpEntity("dashboard home"), StatusCodes.OK))
+          }
+      }) ((accumulatedRoute, currentRoute) => accumulatedRoute ~ currentRoute)
   }
 
   def toHTTPResponse(dashboardResponse: DashboardResponse): HttpResponse =
