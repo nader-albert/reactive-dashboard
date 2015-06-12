@@ -1,4 +1,4 @@
-package mydashboard
+package example
 
 import dashboard.server.{DashboardResponse, DashboardRequest, DashboardHandler}
 import spray.http.{StatusCodes, HttpEntity, HttpMethods, HttpMethod}
