@@ -4,7 +4,7 @@ import akka.actor.{ActorSystem, Props}
 import akka.io.IO
 import dashboard.config.SSLConfiguration
 import dashboard.server.SimpleServer.WebSocketServer
-import mydashboard.MyDashboardHandler
+import example.MyDashboardHandler
 
 //import dashboard.server.SimpleServer.WebSocketServer
 import spray.can.Http
