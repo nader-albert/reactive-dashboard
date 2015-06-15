@@ -19,7 +19,7 @@ class DashboardServer extends SSLConfiguration {
   implicit val system = ActorSystem()
 
   // the handler actor replies to incoming HttpRequests
-  val handler = system.actorOf(Props[DashboardHandler], name = "handler")
+  val handler = system.actorOf(Props[ResourceProvider], name = "handler")
 
   IO(Http) ! Http.Bind(handler, interface = "localhost", port = 8090)
 

@@ -25,17 +25,18 @@ import spray.json._
  * @since  20/05/2015.
  */
 
-case class DashboardRequest(method: HttpMethod, path: PathMatcher[HNil]) //path shouldn't be represented as a String
+case class ResourceRequest(method: HttpMethod, path: PathMatcher[HNil]) //path shouldn't be represented as a String
 
-case class DashboardResponse(body: HttpEntity, code: StatusCode)
+case class RequestParameters(params: Map[String,String])
 
-object DashboardHandler {
+case class ResourceResponse(body: HttpEntity, code: StatusCode)
+
+object ResourceProvider {
 
   import scala.languageFeature.implicitConversions._
 }
 
-trait DashboardHandler extends HttpServiceActor with ActorLogging {
-
+trait ResourceProvider extends HttpServiceActor with ActorLogging {
   //self: Set =>
 
   implicit val timeout: Timeout = 1.second // for the actor 'asks'
@@ -46,17 +47,16 @@ trait DashboardHandler extends HttpServiceActor with ActorLogging {
 
   implicit val timeTableWriter = JsonWriter.func2Writer(jsonValue)
 
-  implicit val timeTableLoadingWriter = JsonWriter.func2Writer(TimeTableLoading.writer)
+ // implicit val timeTableLoadingWriter = JsonWriter.func2Writer(TimeTableLoading.writer)
   implicit val timeTableReseedingStatusWriter = JsonWriter.func2Writer(ReseedingStatus.writer)
 
-  def reactions: Set[(DashboardRequest,DashboardResponse)]
+  def reactions: Set[(ResourceRequest, (Map[String,String] => ResourceResponse))]
 
-  /*
-  override def receive: Receive = runRoute {
+ /* def receive2: Receive = runRoute {
 
     path("dashboard" / "home"){
       complete{
-        toHTTPResponse(DashboardResponse(HttpEntity("dashboard home"), StatusCodes.OK))
+        toHTTPResponse(ResourceResponse(HttpEntity("dashboard home"), StatusCodes.OK))
       }
     } ~ pathPrefix("dashboard" / "dashboard" / "timetable") {
           path("status") {
@@ -66,25 +66,25 @@ trait DashboardHandler extends HttpServiceActor with ActorLogging {
                   timeTableResult match {
                     case TimeTableResult(result) if result.equals("successful") =>
                       toHTTPResponse(
-                        DashboardResponse(
+                        ResourceResponse(
                           HttpEntity(
                             TimeTableReseed(100L, SuccessfulReseed(startedAt=DateTime.now, finishedAt = None, successfulTripCount=9, failedTripCount=0)).toJson.toString),
                           StatusCodes.OK))
 
                     case TimeTableResult(result) if result.equals("failing") =>
                       toHTTPResponse(
-                        DashboardResponse(
+                        ResourceResponse(
                           HttpEntity(
                             TimeTableReseed(200L, FailingReseed(startedAt=DateTime.now, finishedAt = None, successfulTripCount=9, failedTripCount=10)).toJson.toString),
                           StatusCodes.OK))
 
                     case TimeTableResult(result) if result.equals("progress") =>
                       toHTTPResponse(
-                        DashboardResponse(
+                        ResourceResponse(
                           HttpEntity(
                             TimeTableReseed(300L, InProgressReseed(startedAt=DateTime.now, finishedAt = None, successfulTripCount=2509, failedTripCount=10)).toJson.toString),
                           StatusCodes.OK))
-                    case _ => toHTTPResponse(DashboardResponse(HttpEntity("invalid query parameter"), StatusCodes.NoContent))
+                    case _ => toHTTPResponse(ResourceResponse(HttpEntity("invalid query parameter"), StatusCodes.NoContent))
                   }
                 }
               }
@@ -119,18 +119,27 @@ trait DashboardHandler extends HttpServiceActor with ActorLogging {
   }*/
 
   override def receive: Receive = runRoute {
-    reactions.map(reaction =>  path(reactions.head._1.path){
-        complete {
-          toHTTPResponse(reactions.head._2)
-        }
-      }).fold(path("dashboard" / "home"){
-          complete{
-            toHTTPResponse(DashboardResponse(HttpEntity("dashboard home"), StatusCodes.OK))
+    reactions.map(reaction => path(reaction._1.path){
+      val method = reaction._1.method match {
+        case HttpMethods.GET => get
+        case HttpMethods.PUT => put
+        case HttpMethods.POST => post
+      }
+      method{
+        parameterMap { param =>
+          complete {
+            toHTTPResponse(reaction._2(param))
           }
-      }) ((accumulatedRoute, currentRoute) => accumulatedRoute ~ currentRoute)
+        }
+      }
+    }).fold(path("dashboard"){
+        complete{
+          toHTTPResponse(ResourceResponse(HttpEntity("dashboard home"), StatusCodes.OK))
+        }
+    }) ((accumulatedRoute, currentRoute) => accumulatedRoute ~ currentRoute)
   }
 
-  def toHTTPResponse(dashboardResponse: DashboardResponse): HttpResponse =
+  def toHTTPResponse(dashboardResponse: ResourceResponse): HttpResponse =
     HttpResponse(dashboardResponse.code, dashboardResponse.body,
       List(`Access-Control-Allow-Origin`(SomeOrigins(List(HttpOrigin("http", Host("localhost", 8080)))))))
 
