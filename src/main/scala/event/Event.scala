@@ -16,7 +16,7 @@ class PieEvent(items: Map[String, (String, Int)]) extends Event{
 
 case class BarEvent(item: String, value: Float) extends Event{
   def update (currentValue: Float) = {
-    require(currentValue >= value, "bar value cannot move backward")
+    require(currentValue >= value, "bar valu cannot move backward")
     copy(item, value = currentValue)
   }
 }
